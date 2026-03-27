@@ -2,7 +2,9 @@ import streamlit as st
 from state import initialize_state
 from validators import validate_email, validate_phone
 from prompts import generate_questions
-
+import re
+from prompts import fallback_response
+from validators import validate_tech_stack
 initialize_state()
 
 st.title("TalentScout Hiring Assistant")
@@ -46,7 +48,7 @@ if user_input:
             response = "Enter your phone number."
             st.session_state.step = "phone"
         else:
-            response = "Invalid email."
+            response = "Invalid email. Please enter a valid email like example@gmail.com"
 
     elif step == "phone":
         if validate_phone(user_input):
@@ -54,7 +56,7 @@ if user_input:
             response = "Years of experience?"
             st.session_state.step = "experience"
         else:
-            response = "Invalid phone number."
+            response = "Invalid phone number. Please enter a valid phone number."
 
     elif step == "experience":
         candidate["experience"] = user_input
@@ -72,25 +74,56 @@ if user_input:
         st.session_state.step = "tech"
 
     elif step == "tech":
-        tech_list = [tech.strip() for tech in user_input.split(",")]
+
+        tech_list = re.split(r"[, ]+", user_input)
+        tech_list = [tech.strip() for tech in tech_list if tech]
+
+        if not validate_tech_stack(tech_list):
+            response = """
+            Invalid tech stack.
+
+            Please enter valid technologies like:
+            Python, React, Node.js, MongoDB
+            """
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            
+            with st.chat_message("assistant"):
+                st.write(response)
+
+            st.stop()
+
         candidate["tech_stack"] = ", ".join(tech_list)
-        questions = generate_questions(
-        candidate["tech_stack"],
-        candidate["experience"]
-        )
 
-        response = f"""
-        Here are your technical questions:
+        with st.spinner("Generating technical questions..."):
+            questions = generate_questions(
+                candidate["tech_stack"],
+                candidate["experience"]
+            )
+        
+        if "❌" in questions or "⚠️" in questions:
+            response = """
+            ⚠️ Unable to generate questions right now.
 
-        {questions}
+            Please try again later.
+            """
+        else:
+            response = f"""
+            {questions}
 
-        We'll review your responses soon.
-        """
+            ✅ Thank you {candidate['name']}!
+
+            📋 Summary:
+            - Role: {candidate['role']}
+            - Experience: {candidate['experience']} years
+            - Tech Stack: {candidate['tech_stack']}
+
+            🚀 Our team will review your profile and contact you soon.
+            """
 
         st.session_state.step = "done"
 
     else:
-        response = "Please restart or type 'exit'."
+        response = fallback_response()
 
     st.session_state.messages.append({"role": "assistant", "content": response})
 

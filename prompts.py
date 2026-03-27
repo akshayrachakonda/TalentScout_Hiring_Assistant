@@ -1,4 +1,5 @@
 from llm import call_llm
+from llm import cached_llm_call
 
 def generate_questions(tech_stack, experience):
     prompt = f"""
@@ -25,4 +26,15 @@ def generate_questions(tech_stack, experience):
     1. Question
     """
 
-    return call_llm(prompt)
+    return cached_llm_call(prompt)
+
+def fallback_response():
+    return """
+     I'm sorry, I didn't understand that.
+
+    Please provide valid input.
+
+    Example:
+    - Name: John Doe
+    - Tech Stack: Python, React, MongoDB
+    """
